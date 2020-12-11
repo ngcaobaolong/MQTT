@@ -113,11 +113,11 @@ public class MyServer implements Runnable {
                 //receiveFile("Ocean.gif", 2601345);
 
 
-                while (true) {
-                    int a = 5;
-                    if (a < 3) break;
-                    continue;
-                }
+//                while (true) {
+//                    int a = 5;
+//                    if (a < 3) break;
+//                    continue;
+//                }
 
 
                 if (action.equals("LOGIN")) {
