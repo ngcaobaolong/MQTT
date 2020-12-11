@@ -9,9 +9,7 @@ class Global {
     public static int BUFFER_SIZE = 10240;
     volatile public static boolean closed = false;
 
-    volatile public static int sending = 0;
-    volatile public static boolean err_frag = false;
-    volatile public static boolean acked = false;
+    volatile public static boolean busy = false;
 
     volatile public static String username;
 }
@@ -23,23 +21,26 @@ class RecvThread extends Thread {
         this.inpStream = inpStream;
     }
 
-    private static void solveRecvFile(InputStream inpStream, String filename, int filesize) throws IOException {
+    public void notiRecv(String recvMsg) {
+        System.out.println("Message received from server:  " + recvMsg);
+    }
+
+    public void solveRecvFile(String filename, int filesize) throws IOException {
         // downloaded file name: "<filename>-<username>"
-        OutputStream out = new FileOutputStream(new File(FILEPATH + filename + "-" + Global.username));
+        OutputStream out = new FileOutputStream(new File(Global.FILEPATH + filename + "-" + Global.username));
         byte[] data = new byte[Global.BUFFER_SIZE];
         int recv = 0;
         while (recv < filesize){
             int need = Math.min(filesize - recv, Global.BUFFER_SIZE);
             data = inpStream.readNBytes(need);
             recv += need;
-            //sendToServ(outStream,"OK frag");
             out.write(data);
         }
         out.close();
+    }
 
-        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
-        String recvMsg = bufferRead.readLine();
-        //notiRecv(recvMsg);
+    public void notifyEvent(String topic, String sender, String msg) {
+        System.out.println("[" + topic + "]: [" + sender + "]:  " + msg);
     }
 
     public void run() {
@@ -52,9 +53,18 @@ class RecvThread extends Thread {
                     break;
                 }
                 recvMess = bufferRead.readLine();
-                System.out.println("Message received from server:  " + recvMess);
-                if (recvMess.equals("")) {
-                    solveRecvFile(bufferRead);
+
+                String[] recvs = recvMess.split(" ", 6);
+                String topic = recvs[2];
+                String sender = recvs[3];
+                notiRecv(recvMess);
+                if (recvs[1].equals("MESSAGE")){
+                    notifyEvent(topic, sender, recvs[4]);
+                } else
+                if (recvs[1].equals("FILE")) {
+                    notifyEvent(topic, sender, "Downloading [" + recvs[4] + "]");
+                    solveRecvFile(recvs[4], Integer.parseInt(recvs[5]));
+                    notifyEvent(topic, sender, "Downloaded [" + recvs[4] + "]");
                 }
             }
         } catch (Exception e) {
@@ -89,6 +99,17 @@ class SendThread extends Thread {
         }
     }
 
+    public void login(String username) {
+        Global.username = username;
+        JSONObject data = initData("login");
+        sendToServer(data.toString());
+    }
+
+    public void logout(String username) {
+        JSONObject data = initData("logout");
+        sendToServer(data.toString());
+    }
+
     public void subscribe(String topic) {
         JSONObject data = initData("subscribe");
         data.getJSONObject("payload").put("topic", topic);
@@ -110,7 +131,7 @@ class SendThread extends Thread {
 
     public void send_file(String topic, String filename) throws IOException {
         int filesize = (int) new File(filename).length();
-        Global.sending = (int) Math.ceil((double) filesize / Global.BUFFER_SIZE);
+        Global.busy = true;
 
         InputStream inp = new FileInputStream(new File(Global.FILEPATH + filename));
 
@@ -120,21 +141,10 @@ class SendThread extends Thread {
             int need = Math.min(filesize - sent, Global.BUFFER_SIZE);
             data = inp.readNBytes(need);
             sent += need;
-            Global.acked = false;
-            //datOutStream.write(data);     // fixed
             dout.write(data);
-
-            while (true) {
-                if (Global.err_frag) {
-                    return;
-                }
-                if (Global.acked) {
-                    break;
-                }
-            }
         }
         inp.close();
-        Global.sending = 0;
+        Global.busy = false;
     }
 
     public void run() {
@@ -144,7 +154,7 @@ class SendThread extends Thread {
             while (true) {
                 String inp = scanner.nextLine();
 
-                if (Global.sending > 0) {
+                if (Global.busy) {
                     System.out.println("Server is currently busy");
                     continue;
                 }
@@ -171,7 +181,6 @@ class SendThread extends Thread {
                 catch (ArrayIndexOutOfBoundsException | IOException e) {
                     System.out.println("Invalid input");
                 }
-
             }
         } catch (Exception e) {
             System.out.println(e);
