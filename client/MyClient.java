@@ -8,9 +8,7 @@ class Global {
     public static String FILEPATH = "";
     public static int BUFFER_SIZE = 10240;
     volatile public static boolean closed = false;
-
     volatile public static boolean busy = false;
-
     volatile public static String username="long";
 }
 
@@ -27,14 +25,15 @@ class RecvThread extends Thread {
 
     public void solveRecvFile(String filename, int filesize) throws IOException {
         // downloaded file name: "<filename>-<username>"
-        OutputStream out = new FileOutputStream(new File(Global.FILEPATH + filename + "-" + Global.username));
+        OutputStream out = new FileOutputStream(new File(Global.FILEPATH + filename));
         byte[] data = new byte[Global.BUFFER_SIZE];
         int recv = 0;
-        while (recv < filesize){
+        while (recv < filesize) {
             int need = Math.min(filesize - recv, Global.BUFFER_SIZE);
             data = inpStream.readNBytes(need);
             recv += need;
             out.write(data);
+            //System.out.println(recv);
         }
         out.close();
     }
@@ -47,29 +46,30 @@ class RecvThread extends Thread {
         try {
             BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
 
-            String recvMess;
+            String recvMess="";
             while (true) {
                 if (Global.closed) {
                     break;
                 }
                 recvMess = bufferRead.readLine();
-
-                String[] recvs = recvMess.split(" ", 6);
+                notiRecv(recvMess);
+                String[] recvs = recvMess.split(" ", 5);
                 String topic = recvs[2];
                 String sender = recvs[3];
-                notiRecv(recvMess);
                 if (recvs[1].equals("MESSAGE")){
                     notifyEvent(topic, sender, recvs[4]);
                 } else
                 if (recvs[1].equals("FILE")) {
-                    notifyEvent(topic, sender, "Downloading [" + recvs[4] + "]");
-                    solveRecvFile(recvs[4], Integer.parseInt(recvs[5]));
-                    notifyEvent(topic, sender, "Downloaded [" + recvs[4] + "]");
+                    String[] comps = recvs[4].split(" ", 2);
+                    String filename = comps[0];
+                    int filesize = Integer.parseInt(comps[1]);
+                    notifyEvent(topic, sender, "Downloading [" + filename + "]");
+                    solveRecvFile(filename, filesize);
+                    notifyEvent(topic, sender, "Downloaded [" + filename + "]");
                 }
             }
         } catch (Exception e) {
             System.out.println(e);
-
         }
     }
 }

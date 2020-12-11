@@ -3,18 +3,22 @@ import java.io.*;
 import org.json.*;
 
 public class MyServer implements Runnable {
+    // 2601345
     Socket connection;
     InputStream inpStream;
-    static int BUFFER_SIZE = 10240;
+    OutputStream outStream;
+    int BUFFER_SIZE = 10240;
+
     MyServer(Socket connection) throws IOException {
         this.connection = connection;
         this.inpStream = connection.getInputStream();
+        this.outStream = connection.getOutputStream();
     }
 
-    public static void sendToClient(DataOutputStream dout, String sendMess) {
+    public void sendToClient(String sendMess) {
         try {
-            dout.writeUTF(sendMess);  
-            dout.flush(); 
+            DataOutputStream dout = new DataOutputStream(outStream);
+            dout.writeBytes(sendMess + '\n');
             System.out.println("Sent to client: " + sendMess);
         }
         catch (Exception e) {
@@ -37,7 +41,7 @@ public class MyServer implements Runnable {
         System.out.println("[" + topic + "] [" + sender + "]:  " + msg);
     }
 
-    public void solveRecvFile(String filename, int filesize) throws IOException {
+    public void receiveFile(String filename, int filesize) throws IOException {
         OutputStream out = new FileOutputStream(new File(filename));
         byte[] data = new byte[BUFFER_SIZE];
         int recv = 0;
@@ -50,14 +54,51 @@ public class MyServer implements Runnable {
         out.close();
     }
 
-    public void run() {   
+    public void sendFile(String topic, String filename) throws IOException {
+        int filesize = (int) new File(filename).length();
+
+        InputStream inp = new FileInputStream(new File(filename));
+        DataOutputStream dout = new DataOutputStream(outStream);
+
+        byte[] data = new byte[BUFFER_SIZE];
+        int sent = 0;
+        while (sent < filesize) {
+            int need = Math.min(filesize - sent, BUFFER_SIZE);
+            data = inp.readNBytes(need);
+            sent += need;
+            dout.write(data);
+            //System.out.println(sent);
+        }
+        //System.out.print("SERVER says FINISH!");
+        inp.close();
+    }
+
+    public void run() {
+        DataInputStream din = new DataInputStream(inpStream);
         try {
-            DataInputStream din = new DataInputStream(connection.getInputStream());  
-            DataOutputStream dout = new DataOutputStream(connection.getOutputStream());
-            
-            String recvMess="";
-            int user_id;
-            
+
+//            String recvMess="";
+//            int user_id;
+//            sendToClient("NEW FILE cat duy text.txt 5");
+//            try {
+//                recvMess = din.readUTF();
+//
+//                sendFile("cat", "text.txt");
+//                while (true) {
+//                    int a = 5;
+//                    if (a < 3) break;
+//
+//                }
+//                connection.close();
+//                System.out.println("A client disconnected.");
+//            }
+//            catch (IOException e) {
+//                System.out.println(e);
+//            }
+
+
+
+            String recvMess;
             while(true) {
                 recvMess = din.readUTF();
                 System.out.println("Received from client: " + recvMess);
@@ -69,45 +110,66 @@ public class MyServer implements Runnable {
                 String sender = String.valueOf(payload.get("username"));
 
                 System.out.println(obj);
-                solveRecvFile("Ocean.gif", 2601345);
-                int a = 5;
-                if (a < 3) break;
-                continue;
+                //receiveFile("Ocean.gif", 2601345);
 
 
-//                if (action.equals("LOGIN")) {
-//
-//                } else
-//                if (action.equals("LOGOUT")) {
-//
-//                } else
-//                if (action.equals("SUBSCRIBE")) {
-//
-//                } else
-//                if (action.equals("UNSUBSCRIBE")) {
-//
-//                } else
-//                if (action.equals("CHAT")) {
-//                    String topic = String.valueOf(payload.get("topic"));
-//                    String message = String.valueOf(payload.get("message"));
-//                    // Broker select clients to send
-//                    notifyEvent(topic, sender, message);
-//                } else
-//                if (action.equals("FILE")) {
-//                    String topic = String.valueOf(payload.get("topic"));
-//                    String message = String.valueOf(payload.get("message"));
-//                    String filename = String.valueOf(payload.get("filename"));
-//                    int filesize = (Integer) payload.get("filesize");
-//
-//                } else
-//                if (action.equals("QUIT")) {
-//                    break;
-//                }
-            }  
-            din.close();  
-            connection.close();  
+                while (true) {
+                    int a = 5;
+                    if (a < 3) break;
+                    continue;
+                }
+
+
+                if (action.equals("LOGIN")) {
+                    /*
+                        check for not duplicate username
+                        login
+                    */
+                } else
+                if (action.equals("LOGOUT")) {
+                    /*
+                        logout
+                    */
+                } else
+                if (action.equals("SUBSCRIBE")) {
+                    /*
+                        check for valid username & topic
+                        subscribe
+                    */
+                } else
+                if (action.equals("UNSUBSCRIBE")) {
+                    /*
+                        check for valid username & topic
+                        unsubscribe
+                    */
+                } else
+                if (action.equals("CHAT")) {
+                    String topic = String.valueOf(payload.get("topic"));
+                    String message = String.valueOf(payload.get("message"));
+                    /*
+                        check for valid username & topic
+                        sends message to topic
+                    */
+                    notifyEvent(topic, sender, message);
+                } else
+                if (action.equals("FILE")) {
+                    String topic = String.valueOf(payload.get("topic"));
+                    String message = String.valueOf(payload.get("message"));
+                    String filename = String.valueOf(payload.get("filename"));
+                    int filesize = (Integer) payload.get("filesize");
+                    /*
+                        check for valid username & topic
+                        sends file to topic
+                    */
+                } else
+                if (action.equals("QUIT")) {
+                    break;
+                }
+            }
+            din.close();
+            connection.close();
         } catch (IOException e) {
             System.out.println(e);
         }
     }
-}  
+}
