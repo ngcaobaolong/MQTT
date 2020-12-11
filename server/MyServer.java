@@ -1,15 +1,14 @@
 import java.net.*;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.io.*; 
+import java.io.*;
+import org.json.*;
 
-
-public class MyServer implements Runnable{
+public class MyServer implements Runnable {
     Socket connection;
-    MyServer(Socket connection) {
+    InputStream inpStream;
+    static int BUFFER_SIZE = 10240;
+    MyServer(Socket connection) throws IOException {
         this.connection = connection;
+        this.inpStream = connection.getInputStream();
     }
 
     public static void sendToClient(DataOutputStream dout, String sendMess) {
@@ -23,13 +22,6 @@ public class MyServer implements Runnable{
         }
     }
 
-
-
-
-
-
-    
-
     public static void main(String args[]) throws Exception {
         System.out.println("Waiting for client ...");
         ServerSocket server = new ServerSocket(5000); 
@@ -41,6 +33,22 @@ public class MyServer implements Runnable{
         }
     }
 
+    public void notifyEvent(String topic, String sender, String msg) {
+        System.out.println("[" + topic + "] [" + sender + "]:  " + msg);
+    }
+
+    public void solveRecvFile(String filename, int filesize) throws IOException {
+        OutputStream out = new FileOutputStream(new File(filename));
+        byte[] data = new byte[BUFFER_SIZE];
+        int recv = 0;
+        while (recv < filesize){
+            int need = Math.min(filesize - recv, BUFFER_SIZE);
+            data = inpStream.readNBytes(need);
+            recv += need;
+            out.write(data);
+        }
+        out.close();
+    }
 
     public void run() {   
         try {
@@ -54,24 +62,47 @@ public class MyServer implements Runnable{
                 recvMess = din.readUTF();
                 System.out.println("Received from client: " + recvMess);
 
-                if (recvMess.equals("login")) {
+                JSONObject obj = new JSONObject(recvMess);
+                JSONObject payload = (JSONObject) obj.getJSONObject("payload");
 
-                } else
-                if (recvMess.equals("logout")) {
+                String action = String.valueOf(obj.get("action")).toUpperCase();
+                String sender = String.valueOf(payload.get("username"));
 
-                } else
-                if (recvMess.equals("subscribe")) {
+                System.out.println(obj);
+                solveRecvFile("Ocean.gif", 2601345);
+                int a = 5;
+                if (a < 3) break;
+                continue;
 
-                } else
-                if (recvMess.equals("unsubscribe")) {
 
-                } else
-                if (recvMess.equals("chat")) {
-
-                } else
-                if (recvMess.equals("file")) {
-
-                }
+//                if (action.equals("LOGIN")) {
+//
+//                } else
+//                if (action.equals("LOGOUT")) {
+//
+//                } else
+//                if (action.equals("SUBSCRIBE")) {
+//
+//                } else
+//                if (action.equals("UNSUBSCRIBE")) {
+//
+//                } else
+//                if (action.equals("CHAT")) {
+//                    String topic = String.valueOf(payload.get("topic"));
+//                    String message = String.valueOf(payload.get("message"));
+//                    // Broker select clients to send
+//                    notifyEvent(topic, sender, message);
+//                } else
+//                if (action.equals("FILE")) {
+//                    String topic = String.valueOf(payload.get("topic"));
+//                    String message = String.valueOf(payload.get("message"));
+//                    String filename = String.valueOf(payload.get("filename"));
+//                    int filesize = (Integer) payload.get("filesize");
+//
+//                } else
+//                if (action.equals("QUIT")) {
+//                    break;
+//                }
             }  
             din.close();  
             connection.close();  

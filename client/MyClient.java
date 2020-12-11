@@ -11,7 +11,7 @@ class Global {
 
     volatile public static boolean busy = false;
 
-    volatile public static String username;
+    volatile public static String username="long";
 }
 
 class RecvThread extends Thread {
@@ -40,7 +40,7 @@ class RecvThread extends Thread {
     }
 
     public void notifyEvent(String topic, String sender, String msg) {
-        System.out.println("[" + topic + "]: [" + sender + "]:  " + msg);
+        System.out.println("[" + topic + "] [" + sender + "]:  " + msg);
     }
 
     public void run() {
@@ -69,6 +69,7 @@ class RecvThread extends Thread {
             }
         } catch (Exception e) {
             System.out.println(e);
+
         }
     }
 }
@@ -129,6 +130,16 @@ class SendThread extends Thread {
         sendToServer(data.toString());
     }
 
+    public void file(String topic, String filename) throws IOException{
+        JSONObject data = initData("chat");
+        data.getJSONObject("payload").put("topic", topic);
+        data.getJSONObject("payload").put("filename", filename);
+        int filesize = (int) new File(filename).length();
+        data.getJSONObject("payload").put("filesize", filesize);
+        sendToServer(data.toString());
+        send_file(topic, filename);
+    }
+
     public void send_file(String topic, String filename) throws IOException {
         int filesize = (int) new File(filename).length();
         Global.busy = true;
@@ -173,13 +184,13 @@ class SendThread extends Thread {
                         chat(inputs[1], inputs[2]);
                     } else if (action.equals("FILE")) {
                         // file <topic> <filename>
-                        send_file(inputs[1], inputs[2]);
+                        file(inputs[1], inputs[2]);
                     } else {
                         System.out.println("Invalid input");
                     }
                 }
-                catch (ArrayIndexOutOfBoundsException | IOException e) {
-                    System.out.println("Invalid input");
+                catch (Exception e) {
+                    System.out.println(e);
                 }
             }
         } catch (Exception e) {

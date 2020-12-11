@@ -12,5 +12,7 @@ public class test {
         String jsonText = obj.toString();
         System.out.println(jsonText);
 
+        JSONObject huhu = new JSONObject(jsonText);
+
     }
 }
