@@ -31,6 +31,7 @@ class RecvThread extends Thread {
         while (recv < filesize) {
             int need = Math.min(filesize - recv, Global.BUFFER_SIZE);
             data = inpStream.readNBytes(need);
+            System.out.println(data);
             recv += need;
             out.write(data);
             //System.out.println(recv);
@@ -45,15 +46,16 @@ class RecvThread extends Thread {
     public void run() {
         try {
             BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
-
             String recvMess="";
             while (true) {
                 if (Global.closed) {
                     break;
                 }
                 recvMess = bufferRead.readLine();
+
                 notiRecv(recvMess);
                 String[] recvs = recvMess.split(" ", 5);
+
                 String topic = recvs[2];
                 String sender = recvs[3];
                 if (recvs[1].equals("MESSAGE")){
@@ -66,6 +68,8 @@ class RecvThread extends Thread {
                     notifyEvent(topic, sender, "Downloading [" + filename + "]");
                     solveRecvFile(filename, filesize);
                     notifyEvent(topic, sender, "Downloaded [" + filename + "]");
+                } else {
+                    System.out.println("HUHU");
                 }
             }
         } catch (Exception e) {
@@ -75,10 +79,10 @@ class RecvThread extends Thread {
 }
 
 class SendThread extends Thread {
-    DataOutputStream dout;
+    OutputStream outStream;
 
     SendThread(OutputStream outStream) {
-        this.dout = new DataOutputStream(outStream);
+        this.outStream = outStream;
     }
 
     public JSONObject initData(String action) {
@@ -90,12 +94,12 @@ class SendThread extends Thread {
         return data;
     }
 
-    public void sendToServer(String command) {
+    public void sendToServer(String msg) {
         try {
-            dout.writeUTF(command);
-            dout.flush();
+            DataOutputStream dout = new DataOutputStream(outStream);
+            dout.writeBytes(msg + '\n');
         }
-        catch (IOException e) {
+        catch (Exception e){
             System.out.println(e);
         }
     }
@@ -145,7 +149,7 @@ class SendThread extends Thread {
         Global.busy = true;
 
         InputStream inp = new FileInputStream(new File(Global.FILEPATH + filename));
-
+        DataOutputStream dout = new DataOutputStream(outStream);
         byte[] data = new byte[Global.BUFFER_SIZE];
         int sent = 0;
         while (sent < filesize) {
@@ -173,6 +177,12 @@ class SendThread extends Thread {
 
                 try {
                     String action = inputs[0].toUpperCase();
+//                    System.out.println(action);
+//                    if (action.equals("PPP")) {
+//                        sendToServer("PPP");
+//                        continue;
+//                    }
+
                     if (action.equals("SUBSCRIBE")) {
                         // subscribe <topic>
                         subscribe(inputs[1]);
