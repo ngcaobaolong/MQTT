@@ -9,7 +9,9 @@ class Global {
     public static int BUFFER_SIZE = 10240;
     volatile public static boolean closed = false;
     volatile public static boolean busy = false;
-    volatile public static String username="long";
+    volatile public static boolean accept = false;
+    volatile public static boolean reject = false;
+    volatile public static String username="long";  // change username when adding broker
 }
 
 class RecvThread extends Thread {
@@ -24,17 +26,15 @@ class RecvThread extends Thread {
     }
 
     public void solveRecvFile(String filename, int filesize) throws IOException {
-        // downloaded file name: "<filename>-<username>"
-        OutputStream out = new FileOutputStream(new File(Global.FILEPATH + filename));
+        // downloaded file name: "<username>-<filename>"
+        OutputStream out = new FileOutputStream(new File(Global.FILEPATH + Global.username + "-" + filename));
         byte[] data = new byte[Global.BUFFER_SIZE];
         int recv = 0;
         while (recv < filesize) {
             int need = Math.min(filesize - recv, Global.BUFFER_SIZE);
             data = inpStream.readNBytes(need);
-            System.out.println(data);
             recv += need;
             out.write(data);
-            //System.out.println(recv);
         }
         out.close();
     }
@@ -47,29 +47,35 @@ class RecvThread extends Thread {
         try {
             BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
             String recvMess="";
+
             while (true) {
                 if (Global.closed) {
                     break;
                 }
                 recvMess = bufferRead.readLine();
-
                 notiRecv(recvMess);
                 String[] recvs = recvMess.split(" ", 5);
-
                 String topic = recvs[2];
                 String sender = recvs[3];
+
                 if (recvs[1].equals("MESSAGE")){
                     notifyEvent(topic, sender, recvs[4]);
                 } else
                 if (recvs[1].equals("FILE")) {
-                    String[] comps = recvs[4].split(" ", 2);
-                    String filename = comps[0];
-                    int filesize = Integer.parseInt(comps[1]);
-                    notifyEvent(topic, sender, "Downloading [" + filename + "]");
-                    solveRecvFile(filename, filesize);
-                    notifyEvent(topic, sender, "Downloaded [" + filename + "]");
+                    while (true) {
+                        if (Global.reject || Global.accept) break;
+                    }
+                    if (Global.accept) {
+                        String[] comps = recvs[4].split(" ", 2);
+                        String filename = comps[0];
+                        int filesize = Integer.parseInt(comps[1]);
+                        notifyEvent(topic, sender, "Downloading [" + filename + "]");
+                        solveRecvFile(filename, filesize);
+                        notifyEvent(topic, sender, "Downloaded [" + filename + "]");
+                    }
+                    Global.accept = Global.reject = false;
                 } else {
-                    System.out.println("HUHU");
+                    System.out.println("CAN NOT UNDERSTAND SERVER");
                 }
             }
         } catch (Exception e) {
@@ -135,7 +141,7 @@ class SendThread extends Thread {
     }
 
     public void file(String topic, String filename) throws IOException{
-        JSONObject data = initData("chat");
+        JSONObject data = initData("file");
         data.getJSONObject("payload").put("topic", topic);
         data.getJSONObject("payload").put("filename", filename);
         int filesize = (int) new File(filename).length();
@@ -169,6 +175,7 @@ class SendThread extends Thread {
             while (true) {
                 String inp = scanner.nextLine();
 
+
                 if (Global.busy) {
                     System.out.println("Server is currently busy");
                     continue;
@@ -177,13 +184,14 @@ class SendThread extends Thread {
 
                 try {
                     String action = inputs[0].toUpperCase();
-//                    System.out.println(action);
-//                    if (action.equals("PPP")) {
-//                        sendToServer("PPP");
-//                        continue;
-//                    }
 
-                    if (action.equals("SUBSCRIBE")) {
+                    if (action.equals("LOGIN")) {
+                        // login <username>
+                        login(inputs[1]);
+                    } else if (action.equals("LOGOUT")) {
+                        // logout
+                        logout(Global.username);
+                    } else if (action.equals("SUBSCRIBE")) {
                         // subscribe <topic>
                         subscribe(inputs[1]);
                     } else if (action.equals("UNSUBSCRIBE")) {
@@ -195,6 +203,17 @@ class SendThread extends Thread {
                     } else if (action.equals("FILE")) {
                         // file <topic> <filename>
                         file(inputs[1], inputs[2]);
+                    } else if (action.equals("ACCEPT")) {
+                        // accept || reject
+                        sendToServer(action);
+                        Global.accept = true;
+                    } else if (action.equals("REJECT")) {
+                        // file <topic> <filename>
+                        sendToServer(action);
+                        Global.reject = true;
+                    } else if (action.equals("QUIT")) {
+                        sendToServer("QUIT");
+                        break;
                     } else {
                         System.out.println("Invalid input");
                     }
