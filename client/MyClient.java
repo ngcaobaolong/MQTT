@@ -11,7 +11,7 @@ class Global {
     volatile public static boolean busy = false;
     volatile public static boolean accept = false;
     volatile public static boolean reject = false;
-    volatile public static String username="long";  // change username when adding broker
+    volatile public static String username="";  // change username when adding broker
 }
 
 class RecvThread extends Thread {

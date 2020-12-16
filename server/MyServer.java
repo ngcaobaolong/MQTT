@@ -1,19 +1,33 @@
 import java.net.*;
 import java.io.*;
 import org.json.*;
+import java.util.*;
+
+class Global {
+    public static int BUFFER_SIZE = 10240;
+    volatile public static boolean busy = false;
+    volatile public static String[] subscribers;
+    public static String[] topic = {"security","gamer","developer"};
+    volatile public static List<String> client = new ArrayList<String>();
+}
 
 public class MyServer implements Runnable {
     Socket connection;
     InputStream inpStream;
     OutputStream outStream;
-    int BUFFER_SIZE = 10240;
 
     MyServer(Socket connection) throws IOException {
         this.connection = connection;
         this.inpStream = connection.getInputStream();
         this.outStream = connection.getOutputStream();
     }
-
+    public boolean checkClient(String username) {
+        for (int i = 0;i<Global.client.size();i++) {
+            if (username.equals(Global.client.get(i)))
+                return true;
+        }
+        return false;
+    }
     public void sendToClient(String sendMess) {
         try {
             DataOutputStream dout = new DataOutputStream(outStream);
@@ -42,10 +56,10 @@ public class MyServer implements Runnable {
 
     public void receiveFile(String filename, int filesize) throws IOException {
         OutputStream out = new FileOutputStream(new File(filename));
-        byte[] data = new byte[BUFFER_SIZE];
+        byte[] data = new byte[Global.BUFFER_SIZE];
         int recv = 0;
         while (recv < filesize){
-            int need = Math.min(filesize - recv, BUFFER_SIZE);
+            int need = Math.min(filesize - recv, Global.BUFFER_SIZE);
             data = inpStream.readNBytes(need);
             recv += need;
             out.write(data);
@@ -66,10 +80,10 @@ public class MyServer implements Runnable {
         InputStream inp = new FileInputStream(new File(filename));
         DataOutputStream dout = new DataOutputStream(outStream);
 
-        byte[] data = new byte[BUFFER_SIZE];
+        byte[] data = new byte[Global.BUFFER_SIZE];
         int sent = 0;
         while (sent < filesize) {
-            int need = Math.min(filesize - sent, BUFFER_SIZE);
+            int need = Math.min(filesize - sent, Global.BUFFER_SIZE);
             data = inp.readNBytes(need);
             sent += need;
             dout.write(data);
@@ -97,19 +111,12 @@ public class MyServer implements Runnable {
                 String action = String.valueOf(obj.get("action")).toUpperCase();
                 String sender = String.valueOf(payload.get("username"));
 
-                //System.out.println(obj);
-
-
                 if (action.equals("LOGIN")) {
-                    /*
-                        check for not duplicate username
-                        login
-                    */
+                    if (!Global.client.contains(sender)) Global.client.add(sender);
+                        else System.out.println("A client with that name already existed.");
                 } else
                 if (action.equals("LOGOUT")) {
-                    /*
-                        logout
-                    */
+                    Global.client.remove(sender);
                 } else
                 if (action.equals("SUBSCRIBE")) {
                     /*
