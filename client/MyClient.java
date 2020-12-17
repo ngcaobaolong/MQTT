@@ -54,6 +54,11 @@ class RecvThread extends Thread {
                 }
                 recvMess = bufferRead.readLine();
                 notiRecv(recvMess);
+                
+                if (recvMess.equals("400 SERVER BUSY")) {
+                    continue;
+                }
+                
                 String[] recvs = recvMess.split(" ", 5);
                 String topic = recvs[2];
                 String sender = recvs[3];
