@@ -17,8 +17,11 @@ public class MyServer implements Runnable {
     Socket connection;
     InputStream inpStream;
     OutputStream outStream;
+    private volatile static List<String> topic = new ArrayList<String>();
 
-    private static List<String> topic = new ArrayList<String>();
+    public static List<String> getTopic() {
+        return topic;
+    }
 
     MyServer(Socket connection) throws IOException {
         this.connection = connection;
@@ -43,15 +46,17 @@ public class MyServer implements Runnable {
             System.out.println("Unknown Error.");
         }
     }
-
+    //MAIN
     public static void main(String args[]) throws Exception {
         System.out.println("Waiting for client ...");
-        ServerSocket server = new ServerSocket(5000); 
-        
+        ServerSocket server = new ServerSocket(5000);
+
         while (true) {
             Socket connection = server.accept();
             System.out.println("New client connected.");
-            new Thread(new MyServer(connection)).start();
+            Thread t = new Thread(new MyServer(connection));
+            t.start();
+            System.out.println(MyServer.getTopic().toString());
         }
     }
 
@@ -97,6 +102,7 @@ public class MyServer implements Runnable {
     }
 
     public void run() {
+
         String username = "";
         BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
         try {
@@ -126,21 +132,25 @@ public class MyServer implements Runnable {
                         else System.out.println("Invalid username.");
                 } else
                 if (action.equals("LOGOUT")) {
+                    //remove username out of user list
                     Global.client.remove(sender);
                     username = "";
                 } else
                 if (action.equals("SUBSCRIBE")) {
+                    //add topic into topic list
                     this.topic.add(String.valueOf(payload.get("topic")));
                 } else
                 if (action.equals("UNSUBSCRIBE")) {
                     this.topic.remove(String.valueOf(payload.get("topic")));
                 } else
                 if (action.equals("CHAT")) {
-                    String topic = String.valueOf(payload.get("topic"));
+                    //Chat not done yet
+                    String topic_publish = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
-                    notifyMessage(topic, sender, message);
+                    notifyMessage(topic_publish, sender, message);
                 } else if (action.equals("FILE")) {
-                    String topic = String.valueOf(payload.get("topic"));
+                    //File not done yet
+                    String topic_publish = String.valueOf(payload.get("topic"));
                     String filename = String.valueOf(payload.get("filename"));
                     int filesize = (Integer) payload.get("filesize");
                     /*
@@ -150,7 +160,7 @@ public class MyServer implements Runnable {
 
                     //for testing purpose only
                     receiveFile(filename, filesize);
-                    sendFile(topic, sender, filename);
+                    sendFile(topic_publish, sender, filename);
                     //
                 }
             }
