@@ -9,26 +9,22 @@ import java.util.*;
 class Global {
     static int BUFFER_SIZE = 10240;
     volatile static boolean busy = false;
-    volatile static String[] subscribers;
-    static String[] topic_init = {"security", "gamer", "developer"};
-    public static List<String> topic = Arrays.asList(topic_init);
     volatile static List<userStruct> userStructList = new ArrayList<userStruct>();
 }
 
 //Struct-like class
 class userStruct {
-    public static String username;
-    public static Socket connection;
-    public static InputStream inpStream;
-    public static OutputStream outStream;
-    public static List<String> topic = new ArrayList<String>();
+    static String username = "";
+    static Socket connection;
+    static InputStream inpStream;
+    static OutputStream outStream;
+    static List<String> topic = new ArrayList<String>();
 }
 
 //Multi threading
 public class MyServer implements Runnable {
     userStruct user = new userStruct();
     private volatile static List<String> topic = new ArrayList<String>();
-
     MyServer(Socket connection) throws IOException {
         this.user.connection = connection;
         this.user.inpStream = connection.getInputStream();
@@ -61,7 +57,7 @@ public class MyServer implements Runnable {
 
         while (true) {
             Socket connection = server.accept();
-            System.out.println("New client connected.");
+            System.out.println("New client connected. Socker.no "+connection);
             new Thread(new MyServer(connection)).start();
         }
     }
@@ -108,6 +104,7 @@ public class MyServer implements Runnable {
     }
 
     public void run() {
+        System.out.println(this.user.username + " " + this.user.topic + " " + this.user.connection);
         BufferedReader bufferRead = new BufferedReader(new InputStreamReader(this.user.inpStream));
         try {
             String recvMess;
@@ -131,7 +128,7 @@ public class MyServer implements Runnable {
                 if (action.equals("LOGIN")) {
                     if (!checkClient(sender) && this.user.username.equals("")) {
                         this.user.username = sender;
-                        Global.userStructList.add(user);
+                        Global.userStructList.add(this.user);
                     } else System.out.println("Invalid username.");
                 } else if (action.equals("LOGOUT")) {
                     //remove username out of user list
@@ -156,6 +153,7 @@ public class MyServer implements Runnable {
                     }
                 } else if (action.equals("CHAT")) {
                     //Chat not done yet
+                    System.out.println(Global.userStructList.toString());
                     String topic = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
                     for (int i = 0; i < Global.userStructList.size(); i++) {
