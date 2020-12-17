@@ -80,15 +80,11 @@ public class MyServer implements Runnable {
         out.close();
     }
 
-    public void sendFile(String topic, String sender, String filename) throws IOException {
+    public void sendFile(String topic, String sender, String filename, OutputStream outStream) throws IOException {
         int filesize = (int) new File(filename).length();
-        sendToClient("NEW FILE " + topic + " " + sender + " " + filename + " " + filesize, this.user.outStream);
-
+        sendToClient("NEW FILE " + topic + " " + sender + " " + filename + " " + filesize, outStream);
         BufferedReader bufferRead = new BufferedReader(new InputStreamReader(this.user.inpStream));
         String recvMess = bufferRead.readLine().toUpperCase();
-        if (!recvMess.equals("ACCEPT")) {
-            return;
-        }
 
         InputStream inp = new FileInputStream(new File(filename));
         DataOutputStream dout = new DataOutputStream(this.user.outStream);
@@ -160,9 +156,10 @@ public class MyServer implements Runnable {
                     String topic = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
                     for (int i = 0; i < Global.userStructList.size(); i++) {
-                        if (Global.userStructList.get(i).topic.contains(topic))
+                        if (Global.userStructList.get(i).topic.contains(topic)) {
                             tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
-                        sendToClient(tmp, Global.userStructList.get(i).outStream);
+                            sendToClient(tmp, Global.userStructList.get(i).outStream);
+                        }
                     }
                     notifyMessage(topic, sender, message);
                 } else if (action.equals("FILE")) {
@@ -170,9 +167,10 @@ public class MyServer implements Runnable {
                     String topic = String.valueOf(payload.get("topic"));
                     String filename = String.valueOf(payload.get("filename"));
                     int filesize = (Integer) payload.get("filesize");
+                    receiveFile(filename, filesize);
                     for (int i = 0; i < Global.userStructList.size(); i++)
                         if (Global.userStructList.get(i).topic.contains(topic)) {
-
+                            sendFile(topic, Global.userStructList.get(i).username, filename,Global.userStructList.get(i).outStream);
                         }
                 }
             }
