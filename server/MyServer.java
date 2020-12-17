@@ -14,17 +14,18 @@ class Global {
 
 //Struct-like class
 class userStruct {
-    static String username = "";
-    static Socket connection;
-    static InputStream inpStream;
-    static OutputStream outStream;
-    static List<String> topic = new ArrayList<String>();
+    public String username = "";
+    public Socket connection;
+    public InputStream inpStream;
+    public OutputStream outStream;
+    public List<String> topic = new ArrayList<String>();
 }
 
 //Multi threading
 public class MyServer implements Runnable {
     userStruct user = new userStruct();
     private volatile static List<String> topic = new ArrayList<String>();
+
     MyServer(Socket connection) throws IOException {
         this.user.connection = connection;
         this.user.inpStream = connection.getInputStream();
@@ -57,7 +58,7 @@ public class MyServer implements Runnable {
 
         while (true) {
             Socket connection = server.accept();
-            System.out.println("New client connected. Socker.no "+connection);
+            System.out.println("New client connected. Socker.no " + connection);
             new Thread(new MyServer(connection)).start();
         }
     }
@@ -104,7 +105,9 @@ public class MyServer implements Runnable {
     }
 
     public void run() {
-        System.out.println(this.user.username + " " + this.user.topic + " " + this.user.connection);
+        String tmp = "";
+        for (int i = 0; i < Global.userStructList.size(); i++)
+            System.out.println(Global.userStructList.get(i).username);
         BufferedReader bufferRead = new BufferedReader(new InputStreamReader(this.user.inpStream));
         try {
             String recvMess;
@@ -126,9 +129,9 @@ public class MyServer implements Runnable {
                 String action = String.valueOf(obj.get("action")).toUpperCase();
                 String sender = String.valueOf(payload.get("username"));
                 if (action.equals("LOGIN")) {
-                    if (!checkClient(sender) && this.user.username.equals("")) {
-                        this.user.username = sender;
-                        Global.userStructList.add(this.user);
+                    if (!checkClient(sender) && user.username.equals("")) {
+                        user.username = sender;
+                        Global.userStructList.add(user);
                     } else System.out.println("Invalid username.");
                 } else if (action.equals("LOGOUT")) {
                     //remove username out of user list
@@ -158,23 +161,19 @@ public class MyServer implements Runnable {
                     String message = String.valueOf(payload.get("message"));
                     for (int i = 0; i < Global.userStructList.size(); i++) {
                         if (Global.userStructList.get(i).topic.contains(topic))
-                            sendToClient(message, Global.userStructList.get(i).outStream);
+                            tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
+                        sendToClient(tmp, Global.userStructList.get(i).outStream);
                     }
                     notifyMessage(topic, sender, message);
                 } else if (action.equals("FILE")) {
                     //File not done yet
-                    String topic_publish = String.valueOf(payload.get("topic"));
+                    String topic = String.valueOf(payload.get("topic"));
                     String filename = String.valueOf(payload.get("filename"));
                     int filesize = (Integer) payload.get("filesize");
-                    /*
-                        check for valid username & topic
-                        sends file to topic
-                    */
+                    for (int i = 0; i < Global.userStructList.size(); i++)
+                        if (Global.userStructList.get(i).topic.contains(topic)) {
 
-                    //for testing purpose only
-                    receiveFile(filename, filesize);
-                    sendFile(topic_publish, sender, filename);
-                    //
+                        }
                 }
             }
         } catch (Exception e) {
