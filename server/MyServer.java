@@ -3,24 +3,29 @@ import java.io.*;
 import org.json.*;
 import java.util.*;
 
+//Khai bao bien toan cuc, cho ca parent thread va ca child thread co the access
 class Global {
     public static int BUFFER_SIZE = 10240;
     volatile public static boolean busy = false;
     volatile public static String[] subscribers;
-    public static String[] topic = {"security","gamer","developer"};
+    static String[] topic_init= {"security","gamer","developer"};
+    public static List<String> topic = Arrays.asList(topic_init);
     volatile public static List<String> client = new ArrayList<String>();
 }
-
+//Multi threading
 public class MyServer implements Runnable {
     Socket connection;
     InputStream inpStream;
     OutputStream outStream;
+
+    private static List<String> topic = new ArrayList<String>();
 
     MyServer(Socket connection) throws IOException {
         this.connection = connection;
         this.inpStream = connection.getInputStream();
         this.outStream = connection.getOutputStream();
     }
+
     public boolean checkClient(String username) {
         for (int i = 0;i<Global.client.size();i++) {
             if (username.equals(Global.client.get(i)))
@@ -92,6 +97,7 @@ public class MyServer implements Runnable {
     }
 
     public void run() {
+        String username = "";
         BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
         try {
             String recvMess;
@@ -103,40 +109,35 @@ public class MyServer implements Runnable {
                     break;
                 }
 
-                System.out.println("Received from client: " + recvMess);
+                if (username.equals(""))
+                    System.out.println("Received from guess client: " + recvMess);
+                else System.out.println("Received from " + username + " :" + recvMess);
 
                 JSONObject obj = new JSONObject(recvMess);
                 JSONObject payload = (JSONObject) obj.getJSONObject("payload");
 
                 String action = String.valueOf(obj.get("action")).toUpperCase();
                 String sender = String.valueOf(payload.get("username"));
-
                 if (action.equals("LOGIN")) {
-                    if (!Global.client.contains(sender)) Global.client.add(sender);
-                        else System.out.println("A client with that name already existed.");
+                    if (!Global.client.contains(sender) && username.equals("")) {
+                        Global.client.add(sender);
+                        username = sender;
+                    }
+                        else System.out.println("Invalid username.");
                 } else
                 if (action.equals("LOGOUT")) {
                     Global.client.remove(sender);
+                    username = "";
                 } else
                 if (action.equals("SUBSCRIBE")) {
-                    /*
-                        check for valid username & topic
-                        subscribe
-                    */
+                    this.topic.add(String.valueOf(payload.get("topic")));
                 } else
                 if (action.equals("UNSUBSCRIBE")) {
-                    /*
-                        check for valid username & topic
-                        unsubscribe
-                    */
+                    this.topic.remove(String.valueOf(payload.get("topic")));
                 } else
                 if (action.equals("CHAT")) {
                     String topic = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
-                    /*
-                        check for valid username & topic
-                        sends message to topic
-                    */
                     notifyMessage(topic, sender, message);
                 } else if (action.equals("FILE")) {
                     String topic = String.valueOf(payload.get("topic"));
