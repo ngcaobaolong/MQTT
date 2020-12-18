@@ -8,7 +8,7 @@ import java.util.*;
 //Khai bao bien toan cuc, cho ca parent thread va ca child thread co the access
 class Global {
     static int BUFFER_SIZE = 10240;
-    volatile static boolean busy = false;
+    volatile boolean busy = false;
     volatile static List<userStruct> userStructList = new ArrayList<userStruct>();
 }
 
@@ -106,13 +106,12 @@ public class MyServer implements Runnable {
             String recvMess;
             while (true) {
                 recvMess = bufferRead.readLine();
-                System.out.println(recvMess);
                 if (recvMess.equals("QUIT")) {
                     System.out.println("A client offline.");
                     break;
                 }
 
-                if (user.username.equals(""))
+                if (this.user.username.equals(""))
                     System.out.println("Received from guess client: " + recvMess);
                 else System.out.println("Received from " + this.user.username + " :" + recvMess);
 
@@ -123,29 +122,34 @@ public class MyServer implements Runnable {
                 String sender = String.valueOf(payload.get("username"));
                 if (action.equals("LOGIN")) {
                     if (!checkClient(sender) && user.username.equals("")) {
-                        user.username = sender;
+                        this.user.username = sender;
                         Global.userStructList.add(user);
+                        sendToClient("NEW MESSAGE SERVER LOGGEDIN " + this.user.username, this.user.outStream);
                     } else System.out.println("Invalid username.");
                 } else if (action.equals("LOGOUT")) {
                     //remove username out of user list
                     for (int i = 0; i < Global.userStructList.size(); i++)
                         if (Global.userStructList.get(i).username.equals(this.user.username)) {
+                            sendToClient("NEW MESSAGE SERVER LOGGEDOUT " + this.user.username, this.user.outStream);
                             Global.userStructList.remove(i);
+                            this.user.username = "";
+                            this.user.topic.clear();
                             break;
                         }
-                    this.user.username = "";
-                    this.user.topic.clear();
                 } else if (action.equals("SUBSCRIBE")) {
                     //add topic into topic list
                     for (int i = 0; i < Global.userStructList.size(); i++) {
                         if (Global.userStructList.get(i).username.equals(this.user.username))
                             Global.userStructList.get(i).topic.add(String.valueOf(payload.get("topic")));
+                        sendToClient("NEW MESSAGE SERVER SUBSCRIBED " + topic, Global.userStructList.get(i).outStream);
                     }
 
                 } else if (action.equals("UNSUBSCRIBE")) {
                     for (int i = 0; i < Global.userStructList.size(); i++) {
-                        if (Global.userStructList.get(i).username.equals(this.user.username))
+                        if (Global.userStructList.get(i).username.equals(this.user.username)) {
                             Global.userStructList.get(i).topic.remove(String.valueOf(payload.get("topic")));
+                            sendToClient("NEW MESSAGE SERVER UNSUBSCRIBED" + topic, Global.userStructList.get(i).outStream);
+                        }
                     }
                 } else if (action.equals("CHAT")) {
                     //Chat not done yet
@@ -167,7 +171,7 @@ public class MyServer implements Runnable {
                     receiveFile(filename, filesize);
                     for (int i = 0; i < Global.userStructList.size(); i++)
                         if (Global.userStructList.get(i).topic.contains(topic)) {
-                            sendFile(topic, Global.userStructList.get(i).username, filename,Global.userStructList.get(i).outStream);
+                            sendFile(topic, Global.userStructList.get(i).username, filename, Global.userStructList.get(i).outStream);
                         }
                 }
             }
