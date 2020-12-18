@@ -1,37 +1,64 @@
 import java.net.*;
 import java.io.*;
+
 import org.json.*;
 
+import java.util.*;
+
+//Khai bao bien toan cuc, cho ca parent thread va ca child thread co the access
+class Global {
+    static int BUFFER_SIZE = 10240;
+    volatile boolean busy = false;
+    volatile static List<userStruct> userStructList = new ArrayList<userStruct>();
+}
+
+//Struct-like class
+class userStruct {
+    public String username = "";
+    public Socket connection;
+    public InputStream inpStream;
+    public OutputStream outStream;
+    public List<String> topic = new ArrayList<String>();
+}
+
+//Multi threading
 public class MyServer implements Runnable {
-    Socket connection;
-    InputStream inpStream;
-    OutputStream outStream;
-    int BUFFER_SIZE = 10240;
+    userStruct user = new userStruct();
+    private volatile static List<String> topic = new ArrayList<String>();
 
     MyServer(Socket connection) throws IOException {
-        this.connection = connection;
-        this.inpStream = connection.getInputStream();
-        this.outStream = connection.getOutputStream();
+        this.user.connection = connection;
+        this.user.inpStream = connection.getInputStream();
+        this.user.outStream = connection.getOutputStream();
     }
 
-    public void sendToClient(String sendMess) {
+    public boolean checkClient(String username) {
+        if (Global.userStructList.size() == 0) return false;
+        for (int i = 0; i < Global.userStructList.size(); i++) {
+            if (username.equals(Global.userStructList.get(i).username))
+                return true;
+        }
+        return false;
+    }
+
+    public void sendToClient(String sendMess, OutputStream outStream) {
         try {
             DataOutputStream dout = new DataOutputStream(outStream);
             dout.writeBytes(sendMess + '\n');
             System.out.println("Sent to client: " + sendMess);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             System.out.println("Unknown Error.");
         }
     }
 
+    //MAIN
     public static void main(String args[]) throws Exception {
         System.out.println("Waiting for client ...");
-        ServerSocket server = new ServerSocket(5000); 
-        
+        ServerSocket server = new ServerSocket(5000);
+
         while (true) {
             Socket connection = server.accept();
-            System.out.println("New client connected.");
+            System.out.println("New client connected. Socker.no " + connection);
             new Thread(new MyServer(connection)).start();
         }
     }
@@ -42,108 +69,110 @@ public class MyServer implements Runnable {
 
     public void receiveFile(String filename, int filesize) throws IOException {
         OutputStream out = new FileOutputStream(new File(filename));
-        byte[] data = new byte[BUFFER_SIZE];
+        byte[] data = new byte[Global.BUFFER_SIZE];
         int recv = 0;
-        while (recv < filesize){
-            int need = Math.min(filesize - recv, BUFFER_SIZE);
-            data = inpStream.readNBytes(need);
+        while (recv < filesize) {
+            int need = Math.min(filesize - recv, Global.BUFFER_SIZE);
+            data = this.user.inpStream.readNBytes(need);
             recv += need;
             out.write(data);
         }
         out.close();
     }
 
-    public void sendFile(String topic, String sender, String filename) throws IOException {
-        int filesize = (int) new File(filename).length();
-        sendToClient("NEW FILE " + topic + " " + sender + " " + filename + " " + filesize);
-
-        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
-        String recvMess = bufferRead.readLine().toUpperCase();
-        if (!recvMess.equals("ACCEPT")) {
-            return;
-        }
-
-        InputStream inp = new FileInputStream(new File(filename));
+    public void sendFile(String topic, String sender, String filename, OutputStream outStream) throws IOException {
+        File fileToClient = new File(filename);
+        int filesize = (int) fileToClient.length();
+        sendToClient("NEW FILE " + topic + " " + sender + " " + filename + " " + filesize, outStream);
+        InputStream inp = new FileInputStream(fileToClient);
         DataOutputStream dout = new DataOutputStream(outStream);
-
-        byte[] data = new byte[BUFFER_SIZE];
-        int sent = 0;
-        while (sent < filesize) {
-            int need = Math.min(filesize - sent, BUFFER_SIZE);
+        byte[] data = new byte[Global.BUFFER_SIZE];
+        int sent = filesize;
+        while (sent > 0) {
+            int need = Math.min(sent, Global.BUFFER_SIZE);
             data = inp.readNBytes(need);
-            sent += need;
+            sent -= need;
             dout.write(data);
         }
         inp.close();
     }
 
     public void run() {
-        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(inpStream));
+        String tmp = "";
+        for (int i = 0; i < Global.userStructList.size(); i++)
+            System.out.println(Global.userStructList.get(i).username);
+        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(this.user.inpStream));
         try {
             String recvMess;
-            while(true) {
+            while (true) {
                 recvMess = bufferRead.readLine();
-                System.out.println(recvMess);
                 if (recvMess.equals("QUIT")) {
                     System.out.println("A client offline.");
                     break;
                 }
 
-                System.out.println("Received from client: " + recvMess);
+                if (this.user.username.equals(""))
+                    System.out.println("Received from guess client: " + recvMess);
+                else System.out.println("Received from " + this.user.username + " :" + recvMess);
 
                 JSONObject obj = new JSONObject(recvMess);
                 JSONObject payload = (JSONObject) obj.getJSONObject("payload");
 
                 String action = String.valueOf(obj.get("action")).toUpperCase();
                 String sender = String.valueOf(payload.get("username"));
-
-                //System.out.println(obj);
-
-
                 if (action.equals("LOGIN")) {
-                    /*
-                        check for not duplicate username
-                        login
-                    */
-                } else
-                if (action.equals("LOGOUT")) {
-                    /*
-                        logout
-                    */
-                } else
-                if (action.equals("SUBSCRIBE")) {
-                    /*
-                        check for valid username & topic
-                        subscribe
-                    */
-                } else
-                if (action.equals("UNSUBSCRIBE")) {
-                    /*
-                        check for valid username & topic
-                        unsubscribe
-                    */
-                } else
-                if (action.equals("CHAT")) {
+                    if (!checkClient(sender) && user.username.equals("")) {
+                        this.user.username = sender;
+                        Global.userStructList.add(user);
+                        sendToClient("NEW MESSAGE SERVER LOGGEDIN " + this.user.username, this.user.outStream);
+                    } else System.out.println("Invalid username.");
+                } else if (action.equals("LOGOUT")) {
+                    //remove username out of user list
+                    for (int i = 0; i < Global.userStructList.size(); i++)
+                        if (Global.userStructList.get(i).username.equals(this.user.username)) {
+                            sendToClient("NEW MESSAGE SERVER LOGGEDOUT " + this.user.username, this.user.outStream);
+                            Global.userStructList.remove(i);
+                            this.user.username = "";
+                            this.user.topic.clear();
+                            break;
+                        }
+                } else if (action.equals("SUBSCRIBE")) {
+                    //add topic into topic list
+                    for (int i = 0; i < Global.userStructList.size(); i++) {
+                        if (Global.userStructList.get(i).username.equals(this.user.username))
+                            Global.userStructList.get(i).topic.add(String.valueOf(payload.get("topic")));
+                        sendToClient("NEW MESSAGE SERVER SUBSCRIBED " + topic, Global.userStructList.get(i).outStream);
+                    }
+
+                } else if (action.equals("UNSUBSCRIBE")) {
+                    for (int i = 0; i < Global.userStructList.size(); i++) {
+                        if (Global.userStructList.get(i).username.equals(this.user.username)) {
+                            Global.userStructList.get(i).topic.remove(String.valueOf(payload.get("topic")));
+                            sendToClient("NEW MESSAGE SERVER UNSUBSCRIBED" + topic, Global.userStructList.get(i).outStream);
+                        }
+                    }
+                } else if (action.equals("CHAT")) {
+                    //Chat not done yet
+                    System.out.println(Global.userStructList.toString());
                     String topic = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
-                    /*
-                        check for valid username & topic
-                        sends message to topic
-                    */
+                    for (int i = 0; i < Global.userStructList.size(); i++) {
+                        if (Global.userStructList.get(i).topic.contains(topic)) {
+                            tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
+                            sendToClient(tmp, Global.userStructList.get(i).outStream);
+                        }
+                    }
                     notifyMessage(topic, sender, message);
                 } else if (action.equals("FILE")) {
+                    //File not done yet
                     String topic = String.valueOf(payload.get("topic"));
                     String filename = String.valueOf(payload.get("filename"));
                     int filesize = (Integer) payload.get("filesize");
-                    /*
-                        check for valid username & topic
-                        sends file to topic
-                    */
-
-                    //for testing purpose only
                     receiveFile(filename, filesize);
-                    sendFile(topic, sender, filename);
-                    //
+                    for (int i = 0; i < Global.userStructList.size(); i++)
+                        if (Global.userStructList.get(i).topic.contains(topic)) {
+                            sendFile(topic, Global.userStructList.get(i).username, filename, Global.userStructList.get(i).outStream);
+                        }
                 }
             }
         } catch (Exception e) {
@@ -151,9 +180,8 @@ public class MyServer implements Runnable {
         }
 
         try {
-            connection.close();
-        }
-        catch (Exception e) {
+            this.user.connection.close();
+        } catch (Exception e) {
             System.out.println(e);
         }
     }
