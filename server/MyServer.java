@@ -81,20 +81,17 @@ public class MyServer implements Runnable {
     }
 
     public void sendFile(String topic, String sender, String filename, OutputStream outStream) throws IOException {
-        int filesize = (int) new File(filename).length();
+        File fileToClient = new File(filename);
+        int filesize = (int) fileToClient.length();
         sendToClient("NEW FILE " + topic + " " + sender + " " + filename + " " + filesize, outStream);
-        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(this.user.inpStream));
-        String recvMess = bufferRead.readLine().toUpperCase();
-
-        InputStream inp = new FileInputStream(new File(filename));
-        DataOutputStream dout = new DataOutputStream(this.user.outStream);
-
+        InputStream inp = new FileInputStream(fileToClient);
+        DataOutputStream dout = new DataOutputStream(outStream);
         byte[] data = new byte[Global.BUFFER_SIZE];
-        int sent = 0;
-        while (sent < filesize) {
-            int need = Math.min(filesize - sent, Global.BUFFER_SIZE);
+        int sent = filesize;
+        while (sent > 0) {
+            int need = Math.min(sent, Global.BUFFER_SIZE);
             data = inp.readNBytes(need);
-            sent += need;
+            sent -= need;
             dout.write(data);
         }
         inp.close();
