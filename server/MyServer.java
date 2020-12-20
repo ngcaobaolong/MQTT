@@ -124,13 +124,13 @@ public class MyServer implements Runnable {
                     if (!checkClient(sender) && user.username.equals("")) {
                         this.user.username = sender;
                         Global.userStructList.add(user);
-                        sendToClient("NEW MESSAGE SERVER LOGGEDIN " + this.user.username, this.user.outStream);
-                    } else System.out.println("Invalid username.");
+                        sendToClient("NEW MESSAGE SERVER 200 LOGGED-IN", this.user.outStream);
+                    } else sendToClient("NEW MESSAGE SERVER 400 USERNAME-INVALID", this.user.outStream);
                 } else if (action.equals("LOGOUT")) {
                     //remove username out of user list
                     for (int i = 0; i < Global.userStructList.size(); i++)
                         if (Global.userStructList.get(i).username.equals(this.user.username)) {
-                            sendToClient("NEW MESSAGE SERVER LOGGEDOUT " + this.user.username, this.user.outStream);
+                            sendToClient("NEW MESSAGE SERVER 200 LOGGED-OUT", this.user.outStream);
                             Global.userStructList.remove(i);
                             this.user.username = "";
                             this.user.topic.clear();
@@ -139,16 +139,19 @@ public class MyServer implements Runnable {
                 } else if (action.equals("SUBSCRIBE")) {
                     //add topic into topic list
                     for (int i = 0; i < Global.userStructList.size(); i++) {
-                        if (Global.userStructList.get(i).username.equals(this.user.username))
+                        if (Global.userStructList.get(i).username.equals(this.user.username)) {
                             Global.userStructList.get(i).topic.add(String.valueOf(payload.get("topic")));
-                        sendToClient("NEW MESSAGE SERVER SUBSCRIBED " + topic, Global.userStructList.get(i).outStream);
+                            this.user.topic.add(String.valueOf(payload.get("topic")));
+                            sendToClient("NEW MESSAGE SERVER 200 SUBSCRIBED ", Global.userStructList.get(i).outStream);
+                        }
                     }
 
                 } else if (action.equals("UNSUBSCRIBE")) {
                     for (int i = 0; i < Global.userStructList.size(); i++) {
                         if (Global.userStructList.get(i).username.equals(this.user.username)) {
                             Global.userStructList.get(i).topic.remove(String.valueOf(payload.get("topic")));
-                            sendToClient("NEW MESSAGE SERVER UNSUBSCRIBED" + topic, Global.userStructList.get(i).outStream);
+                            this.user.topic.remove(String.valueOf(payload.get("topic")));
+                            sendToClient("NEW MESSAGE SERVER 200 UNSUBSCRIBED", Global.userStructList.get(i).outStream);
                         }
                     }
                 } else if (action.equals("CHAT")) {
@@ -156,23 +159,29 @@ public class MyServer implements Runnable {
                     System.out.println(Global.userStructList.toString());
                     String topic = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
-                    for (int i = 0; i < Global.userStructList.size(); i++) {
-                        if (Global.userStructList.get(i).topic.contains(topic)) {
-                            tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
-                            sendToClient(tmp, Global.userStructList.get(i).outStream);
+                    if (!this.user.topic.contains(topic))
+                        sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
+                    else
+                        for (int i = 0; i < Global.userStructList.size(); i++) {
+                            if (Global.userStructList.get(i).topic.contains(topic)) {
+                                sendToClient("NEW MESSAGE SERVER 200 MESSAGE-SENT", this.user.outStream);
+                                tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
+                                sendToClient(tmp, Global.userStructList.get(i).outStream);
+                            }
                         }
-                    }
-                    notifyMessage(topic, sender, message);
                 } else if (action.equals("FILE")) {
                     //File not done yet
                     String topic = String.valueOf(payload.get("topic"));
                     String filename = String.valueOf(payload.get("filename"));
                     int filesize = (Integer) payload.get("filesize");
                     receiveFile(filename, filesize);
-                    for (int i = 0; i < Global.userStructList.size(); i++)
-                        if (Global.userStructList.get(i).topic.contains(topic)) {
-                            sendFile(topic, Global.userStructList.get(i).username, filename, Global.userStructList.get(i).outStream);
-                        }
+                    if (!this.user.topic.contains(topic))
+                        sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
+                    else
+                        for (int i = 0; i < Global.userStructList.size(); i++)
+                            if (Global.userStructList.get(i).topic.contains(topic)) {
+                                sendFile(topic, Global.userStructList.get(i).username, filename, Global.userStructList.get(i).outStream);
+                            }
                 }
             }
         } catch (Exception e) {
