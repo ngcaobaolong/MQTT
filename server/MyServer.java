@@ -170,7 +170,7 @@ public class MyServer implements Runnable {
                         sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
                     else {
                         for (int i = 0; i < Global.userStructList.size(); i++) {
-                            if (Global.userStructList.get(i).topic.contains(topic)) {
+                            if (Global.userStructList.get(i).topic.contains(topic)&& !Global.userStructList.get(i).username.equals(this.user.username)) {
                                 send = true;
                                 tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
                                 sendToClient(tmp, Global.userStructList.get(i).outStream);
@@ -189,7 +189,7 @@ public class MyServer implements Runnable {
                         sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
                     else
                         for (int i = 0; i < Global.userStructList.size(); i++)
-                            if (Global.userStructList.get(i).topic.contains(topic)) {
+                            if (Global.userStructList.get(i).topic.contains(topic) && !Global.userStructList.get(i).username.equals(this.user.username)) {
                                 sendFile(topic, Global.userStructList.get(i).username, filename, Global.userStructList.get(i).outStream);
                             }
                 }
