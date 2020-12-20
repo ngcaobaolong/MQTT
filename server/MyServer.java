@@ -24,7 +24,7 @@ class userStruct {
 //Multi threading
 public class MyServer implements Runnable {
     userStruct user = new userStruct();
-    private volatile static List<String> topic = new ArrayList<String>();
+    List<String> topic = new ArrayList<String>();
 
     MyServer(Socket connection) throws IOException {
         this.user.connection = connection;
@@ -117,7 +117,6 @@ public class MyServer implements Runnable {
 
                 JSONObject obj = new JSONObject(recvMess);
                 JSONObject payload = (JSONObject) obj.getJSONObject("payload");
-
                 String action = String.valueOf(obj.get("action")).toUpperCase();
                 String sender = String.valueOf(payload.get("username"));
                 if (action.equals("LOGIN")) {
@@ -139,36 +138,47 @@ public class MyServer implements Runnable {
                 } else if (action.equals("SUBSCRIBE")) {
                     //add topic into topic list
                     for (int i = 0; i < Global.userStructList.size(); i++) {
+                        System.out.println(Global.userStructList.get(i).username + " " + Global.userStructList.get(i).topic.toString());
                         if (Global.userStructList.get(i).username.equals(this.user.username)) {
                             Global.userStructList.get(i).topic.add(String.valueOf(payload.get("topic")));
-                            this.user.topic.add(String.valueOf(payload.get("topic")));
+//                            this.user.topic.add(String.valueOf(payload.get("topic")));
                             sendToClient("NEW MESSAGE SERVER 200 SUBSCRIBED ", Global.userStructList.get(i).outStream);
                         }
                     }
 
                 } else if (action.equals("UNSUBSCRIBE")) {
+                    boolean found = false;
                     for (int i = 0; i < Global.userStructList.size(); i++) {
-                        if (Global.userStructList.get(i).username.equals(this.user.username)) {
+                        System.out.println(Global.userStructList.get(i).username + " " + Global.userStructList.get(i).topic.toString());
+                        if (Global.userStructList.get(i).username.equals(this.user.username) && Global.userStructList.get(i).topic.contains(String.valueOf(payload.get("topic")))) {
                             Global.userStructList.get(i).topic.remove(String.valueOf(payload.get("topic")));
-                            this.user.topic.remove(String.valueOf(payload.get("topic")));
+//                            this.user.topic.remove(String.valueOf(payload.get("topic")));
                             sendToClient("NEW MESSAGE SERVER 200 UNSUBSCRIBED", Global.userStructList.get(i).outStream);
+                            found = true;
+                            break;
                         }
                     }
+                    if (!found) {
+                        System.out.println("TOPIC NOT FOUND");
+                        sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
+                    }
                 } else if (action.equals("CHAT")) {
-                    //Chat not done yet
-                    System.out.println(Global.userStructList.toString());
+                    boolean send = false;
                     String topic = String.valueOf(payload.get("topic"));
                     String message = String.valueOf(payload.get("message"));
                     if (!this.user.topic.contains(topic))
                         sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
-                    else
+                    else {
                         for (int i = 0; i < Global.userStructList.size(); i++) {
-                            if (Global.userStructList.get(i).topic.contains(topic)) {
-                                sendToClient("NEW MESSAGE SERVER 200 MESSAGE-SENT", this.user.outStream);
+                            if (Global.userStructList.get(i).topic.contains(topic)&& !Global.userStructList.get(i).username.equals(this.user.username)) {
+                                send = true;
                                 tmp = "NEW MESSAGE " + topic + " " + this.user.username + " " + message;
                                 sendToClient(tmp, Global.userStructList.get(i).outStream);
                             }
                         }
+                    if (send) sendToClient("NEW MESSAGE SERVER 200 MESSAGE-SENT", this.user.outStream); else
+                        sendToClient("NEW MESSAGE SERVER 400 MESSAGE-FAILED", this.user.outStream);
+                    }
                 } else if (action.equals("FILE")) {
                     //File not done yet
                     String topic = String.valueOf(payload.get("topic"));
@@ -179,7 +189,7 @@ public class MyServer implements Runnable {
                         sendToClient("NEW MESSAGE SERVER 400 TOPIC-ERROR", this.user.outStream);
                     else
                         for (int i = 0; i < Global.userStructList.size(); i++)
-                            if (Global.userStructList.get(i).topic.contains(topic)) {
+                            if (Global.userStructList.get(i).topic.contains(topic) && !Global.userStructList.get(i).username.equals(this.user.username)) {
                                 sendFile(topic, Global.userStructList.get(i).username, filename, Global.userStructList.get(i).outStream);
                             }
                 }
