@@ -94,6 +94,7 @@ public class MyServer implements Runnable {
             sent -= need;
             dout.write(data);
         }
+        sendToClient("NEW MESSAGE SERVER 200 FILE-SENT", outStream);
         inp.close();
     }
 
